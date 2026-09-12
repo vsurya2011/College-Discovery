@@ -1,0 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+import { prisma } from '@/lib/prisma';import { requireUser } from '@/lib/auth';import { jsonError } from '@/lib/api';import { z } from 'zod';
+const schema=z.object({collegeIds:z.array(z.string().min(1)).min(2).max(3),label:z.string().max(100).optional()});
+export async function GET(){try{const user=await requireUser();const items=await prisma.savedComparison.findMany({where:{userId:user.id},orderBy:{createdAt:'desc'}});return Response.json({items});}catch{return jsonError('Login required',401);}}
+export async function POST(req:Request){try{const user=await requireUser();const d=schema.parse(await req.json());const existing=await prisma.college.count({where:{id:{in:d.collegeIds}}});if(existing!==d.collegeIds.length)return jsonError('One or more colleges do not exist',404);const item=await prisma.savedComparison.create({data:{userId:user.id,collegeIds:[...new Set(d.collegeIds)],label:d.label}});return Response.json({item},{status:201});}catch(e){if(e instanceof Error&&e.message==='UNAUTHORIZED')return jsonError('Login required',401);if(e instanceof z.ZodError)return jsonError('Choose 2 to 3 colleges');return jsonError('Could not save comparison',500);}}

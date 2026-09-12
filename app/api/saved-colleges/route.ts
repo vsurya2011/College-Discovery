@@ -1,0 +1,7 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+import { prisma } from '@/lib/prisma';import { requireUser } from '@/lib/auth';import { jsonError } from '@/lib/api';import { z } from 'zod';
+const schema=z.object({collegeId:z.string().min(1)});
+export async function GET(){try{const user=await requireUser();const items=await prisma.savedCollege.findMany({where:{userId:user.id},orderBy:{createdAt:'desc'},include:{college:{select:{id:true,name:true,slug:true,city:true,state:true,rating:true,fees:true,placementPct:true}}}});return Response.json({items});}catch(e){return jsonError('Login required',401);}}
+export async function POST(req:Request){try{const user=await requireUser();const {collegeId}=schema.parse(await req.json());const c=await prisma.college.findUnique({where:{id:collegeId},select:{id:true}});if(!c)return jsonError('College not found',404);const item=await prisma.savedCollege.upsert({where:{userId_collegeId:{userId:user.id,collegeId}},update:{},create:{userId:user.id,collegeId}});return Response.json({item},{status:201});}catch(e){if(e instanceof Error&&e.message==='UNAUTHORIZED')return jsonError('Login required',401);if(e instanceof z.ZodError)return jsonError('Invalid college id');return jsonError('Could not save college',500);}}
+export async function DELETE(req:Request){try{const user=await requireUser();const {collegeId}=schema.parse(await req.json());await prisma.savedCollege.deleteMany({where:{userId:user.id,collegeId}});return Response.json({ok:true});}catch(e){return jsonError('Login required',401);}}

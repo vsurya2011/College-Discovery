@@ -1,0 +1,27 @@
+'use client';
+import useSWR from 'swr';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { Heart, MapPin, Star, ExternalLink, ArrowLeft } from 'lucide-react';
+import { useContext, useState } from 'react';
+import { AuthContext } from '@/components/auth-provider';
+import { CollegeImage } from '@/components/college-image';
+
+const fetcher=(u:string)=>fetch(u).then(r=>r.json());
+export default function CollegeDetail(){
+ const {slug}=useParams<{slug:string}>(); const {session}=useContext(AuthContext); const [saving,setSaving]=useState(false);
+ const {data,isLoading,mutate}=useSWR(`/api/colleges/${slug}`,fetcher);
+ if(isLoading) return <main className="container" style={{padding:'40px 0'}}>Loading college…</main>;
+ if(!data?.college) return <main className="container" style={{padding:'40px 0'}}>College not found.</main>;
+ const c=data.college; const reviews=c.reviews ?? [];
+ async function save(){ if(!session){window.location.href='/login?next='+encodeURIComponent(`/colleges/${slug}`);return;} setSaving(true); await fetch('/api/saved-colleges',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({collegeId:c.id})});setSaving(false); }
+ return <main className="container" style={{padding:'34px 0'}}><Link href="/colleges" className="muted" style={{display:'inline-flex',gap:6,alignItems:'center',marginBottom:18}}><ArrowLeft size={15}/>Back to colleges</Link>
+ <div className="card" style={{overflow:'hidden'}}><CollegeImage src={c.imageUrl} alt={`${c.name} campus`} name={c.name} height={300} /><div style={{padding:24}}><div style={{display:'flex',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}><div><h1 style={{margin:'0 0 8px'}}>{c.name}</h1><div className="muted" style={{display:'flex',gap:6,alignItems:'center'}}><MapPin size={15}/>{c.city}, {c.state}</div></div><div style={{display:'flex',gap:9}}><button className="btn btn-secondary" disabled={saving} onClick={save}><Heart size={16}/> {saving?'Saving…':'Save college'}</button><Link href={`/compare?ids=${c.id}`} className="btn btn-primary">Compare</Link></div></div>
+ <p style={{fontSize:16,lineHeight:1.7,maxWidth:900}}>{c.description}</p><div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginTop:20}}>{[['Rating',<><Star size={14} fill="currentColor"/> {c.rating.toFixed(1)}</>],['Fees/year',`₹${(c.fees/100000).toFixed(2)} L / year`],['Placement',`${c.placementPct}%`],['Avg package',`₹${(c.avgPackage/100000).toFixed(1)} LPA`]].map(([k,v])=><div key={String(k)} style={{background:'#f8fafc',padding:14,borderRadius:12}}><div className="muted" style={{fontSize:11}}>{k}</div><strong style={{display:'flex',gap:4,alignItems:'center',marginTop:5}}>{v}</strong></div>)}</div>
+ <section style={{marginTop:28}}><h2>Overview</h2><p className="muted" style={{lineHeight:1.8}}>{c.overview}</p></section>
+ <section style={{marginTop:28}}><h2>Courses</h2><div className="grid-auto">{c.courses.map((course:any)=><div key={course.id} className="card" style={{padding:16}}><strong>{course.name}</strong><div className="muted" style={{marginTop:6,fontSize:13}}>{course.duration} · {course.seats} seats</div></div>)}</div></section>
+ <section style={{marginTop:28}}><h2>Placements</h2><div className="card" style={{padding:18}}><p style={{marginTop:0}}>Placement rate: <strong>{c.placementPct}%</strong></p><p className="muted">Average package: ₹{(c.avgPackage/100000).toFixed(1)} LPA · Highest package: ₹{(c.highestPackage/100000).toFixed(1)} LPA</p><a href={c.website} target="_blank" rel="noreferrer" className="btn btn-secondary">Official website <ExternalLink size={14}/></a></div></section>
+ <section style={{marginTop:28}}><h2>Reviews</h2><div style={{display:'grid',gap:12}}>{reviews.map((r:any)=><div key={r.id} className="card" style={{padding:16}}><div style={{display:'flex',justifyContent:'space-between'}}><strong>{r.title}</strong><span className="badge"><Star size={13} fill="currentColor"/> {r.rating}/5</span></div><p style={{marginBottom:0}}>{r.body}</p><div className="muted" style={{fontSize:12,marginTop:8}}>by {r.user?.name ?? 'Student'}</div></div>)}</div><ReviewForm collegeId={c.id} onDone={mutate}/></section>
+ </div></div></main>
+}
+function ReviewForm({collegeId,onDone}:{collegeId:string;onDone:()=>void}){const {session}=useContext(AuthContext);const [title,setTitle]=useState('');const [body,setBody]=useState('');const [rating,setRating]=useState(5);const [status,setStatus]=useState('');if(!session)return <div className="card" style={{padding:16,marginTop:14}}><Link href="/login" style={{color:'#2563eb',fontWeight:700}}>Login</Link> to add a review.</div>;return <div className="card" style={{padding:16,marginTop:14}}><h3>Add a review</h3><div style={{display:'grid',gap:10}}><input className="input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Review title"/><select className="select" value={rating} onChange={e=>setRating(Number(e.target.value))}>{[5,4,3,2,1].map(n=><option key={n} value={n}>{n}/5</option>)}</select><textarea className="textarea" value={body} onChange={e=>setBody(e.target.value)} rows={4} placeholder="Share your experience"/><button className="btn btn-primary" onClick={async()=>{setStatus('Submitting…');const r=await fetch(`/api/colleges/${collegeId}/reviews`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,body,rating})});setStatus(r.ok?'Review added.':'Could not add review.');if(r.ok){setTitle('');setBody('');onDone();}}}>{status||'Publish review'}</button></div></div>}

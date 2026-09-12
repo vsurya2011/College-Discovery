@@ -1,0 +1,1 @@
+Prisma 7 + Neon seed fix: prisma/seed.ts now loads dotenv and instantiates PrismaClient with PrismaNeon adapter.

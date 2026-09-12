@@ -1,0 +1,4 @@
+API route deployment fix
+
+All Next.js API route handlers are explicitly marked dynamic and Node.js runtime.
+If an older local build still reports 404, stop dev server, delete .next, and run npm run dev again.
